@@ -10,19 +10,12 @@ defmodule Drop do
   #@spec fall_velocity(number(), number()) :: float()
   
   def fall_velocity({planemo, distance}) when distance >= 0 do
-    fall_velocity(planemo, distance)
+    gravity = case planemo do
+      :earth -> 9.8
+      :moon -> 1.6
+      :mars -> 3.71
+    end
+  :math.sqrt(2 * gravity * distance)
   end
   
-  defp fall_velocity(:earth, distance) do
-    :math.sqrt(2 * 9.8 * distance)
-  end
-
-  defp fall_velocity(:moon, distance) do
-    :math.sqrt(2 * 1.6 * distance)
-  end
-
-  defp fall_velocity(:mars, distance) do
-    :math.sqrt(2 * 3.71 * distance)
-  end
-
 end
