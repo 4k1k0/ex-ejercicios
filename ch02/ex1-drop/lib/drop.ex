@@ -9,8 +9,16 @@ defmodule Drop do
   
   @spec fall_velocity(number(), number()) :: float()
   
-  def fall_velocity(distance, gravity \\ 9.8) do
-    :math.sqrt(2 * gravity * distance)
+  def fall_velocity(:earth, distance) do
+    :math.sqrt(2 * 9.8 * distance)
+  end
+
+  def fall_velocity(:moon, distance) do
+    :math.sqrt(2 * 1.6 * distance)
+  end
+
+  def fall_velocity(:mars, distance) do
+    :math.sqrt(2 * 3.71 * distance)
   end
 
 end
