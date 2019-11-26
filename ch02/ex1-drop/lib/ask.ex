@@ -20,7 +20,7 @@ defmodule Ask do
 
   defp get_distance() do
     IO.gets("How far? > ")
-    |> String.strip()
+    |> String.trim()
     |> String.to_integer()
   end
 
