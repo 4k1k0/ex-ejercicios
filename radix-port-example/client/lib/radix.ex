@@ -81,31 +81,31 @@ defmodule RadixPort do
   end
 
   def handle_call({:ingest_file, path}, _from, %{port: port} = state) do
-    {time_us, result} = :timer.tc(fn ->
       if not File.exists?(path) do
         {:reply, {:error, :enoent}, state}
       else
-        File.stream!(path, [], :line)
-        |> Stream.map(&String.trim/1)
-        |> Stream.reject(&(&1 == ""))
-        |> Enum.each(fn uuid ->
-          case transact(port, "INSERT " <> uuid) do
-            "OK" -> :ok
-            "ERR invalid-uuid" -> IO.puts("Invalid UUID skipped: #{uuid}")
-            other -> IO.puts("Unexpected reply: #{inspect(other)}")
-          end
+        {time_us, result} =
+          :timer.tc(fn ->
+            path
+            |> File.stream!()
+            |> Stream.each(fn line -> process_line(String.trim(line), port) end)
+            |> Stream.run()
         end)
 
+        IO.puts("Execution took #{time_us} µs")
+        IO.inspect(result, label: "All processing results")
         {:reply, :ok, state}
-      end
-    end)
-
-    IO.puts("Execution took #{time_us} µs")
-
-    result
+    end
   end
 
-  ## Internal helpers
+  defp process_line(uuid, port) do
+    case transact(port, "INSERT " <> uuid) do
+      "OK" -> :ok
+      "ERR invalid-uuid" -> IO.puts("Invalid UUID skipped: #{uuid}")
+      other -> IO.puts("Unexpected reply: #{inspect(other)}")
+    end
+  end
+
 
   defp send_command(port, cmd) do
     Port.command(port, cmd <> "\n")
