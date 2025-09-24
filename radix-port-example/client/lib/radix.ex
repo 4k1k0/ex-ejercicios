@@ -1,6 +1,7 @@
 defmodule RadixPort do
   @moduledoc """
-  Simple GenServer that manages the Rust port (radix tree).
+  Wrapper for the Rust radix tree port.
+  Supports CREATE, INSERT, and SEARCH commands.
   """
 
   use GenServer
@@ -8,61 +9,89 @@ defmodule RadixPort do
   ## Public API
 
   @doc """
-  Start the radix port manager.
+  Start the RadixPort GenServer.
 
-  `rust_executable` should be the path to the compiled rust binary.
+  Example:
+      {:ok, _pid} = RadixPort.start_link("/path/to/rust-port/target/release/rust-port")
   """
-  def start_link(rust_executable) when is_binary(rust_executable) do
-    GenServer.start_link(__MODULE__, rust_executable, name: __MODULE__)
+  def start_link(rust_exec) when is_binary(rust_exec) do
+    GenServer.start_link(__MODULE__, rust_exec, name: __MODULE__)
   end
 
   @doc """
-  Stream a file line by line and insert each uuid (line) into the Rust ART.
+  Insert a UUID string into the radix tree.
+  Returns :ok or {:error, reason}.
+  """
+  def insert(uuid) when is_binary(uuid) do
+    GenServer.call(__MODULE__, {:insert, uuid})
+  end
 
-  Returns :ok or {:error, reason}
+  @doc """
+  Search for a UUID string in the radix tree.
+  Returns true if found, false otherwise.
+  """
+  def search(uuid) when is_binary(uuid) do
+    GenServer.call(__MODULE__, {:search, uuid})
+  end
+
+  @doc """
+  Load UUIDs from a file line by line without loading into memory.
   """
   def ingest_file(path) when is_binary(path) do
     GenServer.call(__MODULE__, {:ingest_file, path}, :infinity)
   end
 
-  @doc """
-  Search the ART for the given query string. Returns true/false.
-  """
-  def search(query) when is_binary(query) do
-    GenServer.call(__MODULE__, {:search, query})
-  end
-
   ## GenServer callbacks
 
-  def init(rust_executable) do
-    # open the port
+  def init(rust_exec) do
     port =
-      Port.open({:spawn_executable, rust_executable}, [
-        {:args, []},
+      Port.open({:spawn_executable, rust_exec}, [
         :binary,
         :exit_status
       ])
 
-    # ask Rust to create the tree
     send_command(port, "CREATE")
+
+    receive do
+      {^port, {:data, _data}} -> :ok
+      {^port, {:exit_status, status}} -> {:stop, {:port_exited, status}}
+    after
+      1_000 -> :ok
+    end
+
 
     {:ok, %{port: port}}
   end
 
-  def handle_call({:ingest_file, path}, _from, state) do
+  def handle_call({:insert, uuid}, _from, %{port: port} = state) do
+    case transact(port, "INSERT " <> uuid) do
+      "OK" -> {:reply, :ok, state}
+      "ERR invalid-uuid" -> {:reply, {:error, :invalid_uuid}, state}
+      other -> {:reply, {:error, {:unexpected, other}}, state}
+    end
+  end
+
+  def handle_call({:search, uuid}, _from, %{port: port} = state) do
+    case transact(port, "SEARCH " <> uuid) do
+      "FOUND" -> {:reply, true, state}
+      "NOTFOUND" -> {:reply, false, state}
+      "ERR invalid-uuid" -> {:reply, {:error, :invalid_uuid}, state}
+      other -> {:reply, {:error, {:unexpected, other}}, state}
+    end
+  end
+
+  def handle_call({:ingest_file, path}, _from, %{port: port} = state) do
     if not File.exists?(path) do
       {:reply, {:error, :enoent}, state}
     else
-      # stream file line-by-line; default chunk size and :line will stream by line
-      stream = File.stream!(path, [], :line)
-
-      Enum.each(stream, fn line ->
-        uuid = String.trim(line)
-        # skip empty lines
-        if uuid != "" do
-          send_command(state.port, "INSERT " <> uuid)
-          # optionally we could check OK response — we'll ignore for simplicity
-          wait_for_ok(state.port)
+      File.stream!(path, [], :line)
+      |> Stream.map(&String.trim/1)
+      |> Stream.reject(&(&1 == ""))
+      |> Enum.each(fn uuid ->
+        case transact(port, "INSERT " <> uuid) do
+          "OK" -> :ok
+          "ERR invalid-uuid" -> IO.puts("Invalid UUID skipped: #{uuid}")
+          other -> IO.puts("Unexpected reply: #{inspect(other)}")
         end
       end)
 
@@ -70,54 +99,23 @@ defmodule RadixPort do
     end
   end
 
-  def handle_call({:search, query}, _from, state) do
-    send_command(state.port, "SEARCH " <> query)
+  ## Internal helpers
 
-    case receive_port_response(state.port, 5_000) do
-      {:ok, "FOUND"} -> {:reply, true, state}
-      {:ok, "NOTFOUND"} -> {:reply, false, state}
-      {:ok, resp} -> {:reply, {:error, {:unexpected, resp}}, state}
-      {:error, reason} -> {:reply, {:error, reason}, state}
-    end
+  defp send_command(port, cmd) do
+    Port.command(port, cmd <> "\n")
   end
 
-  # handle port exit
-  def handle_info({port, {:exit_status, status}}, %{port: port} = state) do
-    # port exited; escalate or mark unavailable
-    {:noreply, Map.put(state, :exited, status)}
-  end
+  defp transact(port, cmd) do
+    send_command(port, cmd)
 
-  # Unknown messages from port come as {port, {:data, data}}
-  def handle_info({port, {:data, _data}}, state) when port == state.port do
-    # We don't handle unsolicited messages here; they are caught by receive_port_response
-    {:noreply, state}
-  end
-
-  defp send_command(port, command) do
-    # Port.command expects a binary
-    Port.command(port, :erlang.iolist_to_binary([command, "\n"]))
-  end
-
-  defp wait_for_ok(port, timeout \\ 2_000) do
-    case receive_port_response(port, timeout) do
-      {:ok, "OK"} -> :ok
-      {:ok, other} -> {:error, {:unexpected, other}}
-      {:error, reason} -> {:error, reason}
-    end
-  end
-
-  # waits for a single newline-terminated response from the port
-  defp receive_port_response(port, timeout) do
     receive do
       {^port, {:data, data}} ->
-        # data is binary; may contain newline; trim and return
-        resp = data |> to_string() |> String.trim()
-        {:ok, resp}
+        data |> to_string() |> String.trim()
 
       {^port, {:exit_status, status}} ->
         {:error, {:port_exited, status}}
     after
-      timeout ->
+      5_000 ->
         {:error, :timeout}
     end
   end
