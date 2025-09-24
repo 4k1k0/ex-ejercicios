@@ -90,14 +90,13 @@ defmodule RadixPort do
           |> File.stream!()
           |> Stream.chunk_every(1_000)
           |> Stream.each(fn chunk ->
-            # The payload is still lines joined by newlines
-            payload = Enum.join(chunk, "\n")
-            # Calculate the byte size of the payload
-            byte_size = byte_size(payload)
-            
-            # Send the new, more robust command
-            # Note the \n between the byte_size and the payload
-            transact(port, "INSERT_CHUNK #{byte_size}\n#{payload}")
+            payload =
+              chunk 
+              |> Enum.map(fn item -> String.replace(item, "\n", "") end) 
+              |> Enum.join(" ")
+            input = "INSERT_CHUNK " <> payload
+
+            transact(port, input)
           end)
           |> Stream.run()
         end)

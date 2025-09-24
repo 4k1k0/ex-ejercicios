@@ -45,6 +45,26 @@ fn main() -> io::Result<()> {
                     write_resp("ERR no-tree")?;
                 }
             }
+            "INSERT_CHUNK" => {
+                if let (Some(ref mut map), Some(chunk)) = (&mut tree, arg) {
+                    let mut all_ok = true;
+                    
+                    for token in chunk.split_whitespace() {
+                        match Uuid::parse_str(token) {
+                            Ok(uuid) => { map.insert(*uuid.as_bytes(), 1u8); }
+                            Err(_) => { all_ok = false; }
+                        }
+                    }
+
+                    if all_ok  {
+                        write_resp("OK")?;
+                    } else {
+                        write_resp("ERR invalid uuid")?;
+                    }
+                } else {
+                    write_resp("ERR no-tree")?;
+                }
+            }
             "SEARCH" => {
                 if let (Some(ref map), Some(key_str)) = (&tree, arg) {
                     match Uuid::parse_str(key_str) {
@@ -64,7 +84,7 @@ fn main() -> io::Result<()> {
                 }
             }
             _ => {
-                write_resp(&format!("ERR unknown-cmd {}", cmd))?;
+                write_resp(&format!("ERR unknown-cmd {}", cmd.as_str()))?;
             }
         }
     }
