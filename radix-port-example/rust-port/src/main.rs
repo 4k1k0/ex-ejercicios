@@ -1,5 +1,5 @@
-use std::io::{self, BufRead, Write};
 use blart::map::TreeMap;
+use std::io::{self, BufRead, Write};
 use uuid::Uuid;
 
 fn main() -> io::Result<()> {
@@ -70,4 +70,3 @@ fn main() -> io::Result<()> {
     }
     Ok(())
 }
-
