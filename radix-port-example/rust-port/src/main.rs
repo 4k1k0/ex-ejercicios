@@ -1,12 +1,14 @@
 use std::io::{self, BufRead, Write};
 use blart::map::TreeMap;
+use uuid::Uuid;
 
 fn main() -> io::Result<()> {
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
     let mut stdout = io::stdout();
 
-    let mut tree: Option<TreeMap<Box<[u8]>, u8>> = None;
+    // Use [u8; 16] as the key type
+    let mut tree: Option<TreeMap<[u8; 16], u8>> = None;
 
     let mut write_resp = |s: &str| -> io::Result<()> {
         stdout.write_all(s.as_bytes())?;
@@ -30,20 +32,32 @@ fn main() -> io::Result<()> {
             }
             "INSERT" => {
                 if let (Some(ref mut map), Some(key_str)) = (&mut tree, arg) {
-                    let boxed: Box<[u8]> = key_str.as_bytes().to_vec().into_boxed_slice();
-                    map.insert(boxed, 1u8);
-                    write_resp("OK")?;
+                    match Uuid::parse_str(key_str) {
+                        Ok(uuid) => {
+                            map.insert(*uuid.as_bytes(), 1u8);
+                            write_resp("OK")?;
+                        }
+                        Err(_) => {
+                            write_resp("ERR invalid-uuid")?;
+                        }
+                    }
                 } else {
                     write_resp("ERR no-tree")?;
                 }
             }
             "SEARCH" => {
                 if let (Some(ref map), Some(key_str)) = (&tree, arg) {
-                    let slice: &[u8] = key_str.as_bytes();
-                    if map.get(slice).is_some() {
-                        write_resp("FOUND")?;
-                    } else {
-                        write_resp("NOTFOUND")?;
+                    match Uuid::parse_str(key_str) {
+                        Ok(uuid) => {
+                            if map.get(uuid.as_bytes()).is_some() {
+                                write_resp("FOUND")?;
+                            } else {
+                                write_resp("NOTFOUND")?;
+                            }
+                        }
+                        Err(_) => {
+                            write_resp("ERR invalid-uuid")?;
+                        }
                     }
                 } else {
                     write_resp("ERR no-tree")?;
@@ -54,7 +68,6 @@ fn main() -> io::Result<()> {
             }
         }
     }
-
     Ok(())
 }
 
