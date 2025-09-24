@@ -4,12 +4,10 @@ use blart::map::TreeMap;
 fn main() -> io::Result<()> {
     let stdin = io::stdin();
     let mut lines = stdin.lock().lines();
-
-    // Option to hold the tree once created.
-    let mut tree: Option<TreeMap<Vec<u8>, u8>> = None;
-
-    // Helper to write response to stdout and flush
     let mut stdout = io::stdout();
+
+    let mut tree: Option<TreeMap<Box<[u8]>, u8>> = None;
+
     let mut write_resp = |s: &str| -> io::Result<()> {
         stdout.write_all(s.as_bytes())?;
         stdout.write_all(b"\n")?;
@@ -21,52 +19,38 @@ fn main() -> io::Result<()> {
         if line.is_empty() {
             continue;
         }
-
-        // Split into command and rest
         let mut parts = line.splitn(2, ' ');
         let cmd = parts.next().unwrap().to_uppercase();
-        let arg = parts.next().map(str::trim);
+        let arg = parts.next();
 
         match cmd.as_str() {
             "CREATE" => {
                 tree = Some(TreeMap::new());
-                if let Err(e) = write_resp("OK") {
-                    eprintln!("failed to write OK: {}", e);
-                    break;
-                }
+                write_resp("OK")?;
             }
             "INSERT" => {
-                match (&mut tree, arg) {
-                    (Some(ref mut map), Some(key)) => {
-                        // store the raw bytes of the string key
-                        map.insert(key.as_bytes().to_vec(), 1u8);
-                        if let Err(e) = write_resp("OK") {
-                            eprintln!("failed to write OK: {}", e);
-                            break;
-                        }
-                    }
-                    _ => {
-                        let _ = write_resp("ERR no-tree");
-                    }
+                if let (Some(ref mut map), Some(key_str)) = (&mut tree, arg) {
+                    let boxed: Box<[u8]> = key_str.as_bytes().to_vec().into_boxed_slice();
+                    map.insert(boxed, 1u8);
+                    write_resp("OK")?;
+                } else {
+                    write_resp("ERR no-tree")?;
                 }
             }
             "SEARCH" => {
-                match (&tree, arg) {
-                    (Some(ref map), Some(key)) => {
-                        let found = map.get(&key.as_bytes().to_vec()).is_some();
-                        if found {
-                            let _ = write_resp("FOUND");
-                        } else {
-                            let _ = write_resp("NOTFOUND");
-                        }
+                if let (Some(ref map), Some(key_str)) = (&tree, arg) {
+                    let slice: &[u8] = key_str.as_bytes();
+                    if map.get(slice).is_some() {
+                        write_resp("FOUND")?;
+                    } else {
+                        write_resp("NOTFOUND")?;
                     }
-                    _ => {
-                        let _ = write_resp("ERR no-tree");
-                    }
+                } else {
+                    write_resp("ERR no-tree")?;
                 }
             }
             _ => {
-                let _ = write_resp(&format!("ERR unknown-cmd {}", cmd));
+                write_resp(&format!("ERR unknown-cmd {}", cmd))?;
             }
         }
     }
