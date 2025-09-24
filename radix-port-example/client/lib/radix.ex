@@ -81,31 +81,31 @@ defmodule RadixPort do
   end
 
   def handle_call({:ingest_file, path}, _from, %{port: port} = state) do
-      if not File.exists?(path) do
-        {:reply, {:error, :enoent}, state}
-      else
-        {time_us, result} =
-          :timer.tc(fn ->
-            path
-            |> File.stream!()
-            |> Stream.each(fn line -> process_line(String.trim(line), port) end)
-            |> Stream.run()
+    if not File.exists?(path) do
+      {:reply, {:error, :enoent}, state}
+    else
+      {time_us, _result} =
+        :timer.tc(fn ->
+          path
+          |> File.stream!()
+          |> Stream.chunk_every(1_000)
+          |> Stream.each(fn chunk ->
+            # The payload is still lines joined by newlines
+            payload = Enum.join(chunk, "\n")
+            # Calculate the byte size of the payload
+            byte_size = byte_size(payload)
+            
+            # Send the new, more robust command
+            # Note the \n between the byte_size and the payload
+            transact(port, "INSERT_CHUNK #{byte_size}\n#{payload}")
+          end)
+          |> Stream.run()
         end)
 
-        IO.puts("Execution took #{time_us} µs")
-        IO.inspect(result, label: "All processing results")
-        {:reply, :ok, state}
+      IO.puts("Ingestion took #{time_us / 1_000_000} seconds")
+      {:reply, :ok, state}
     end
   end
-
-  defp process_line(uuid, port) do
-    case transact(port, "INSERT " <> uuid) do
-      "OK" -> :ok
-      "ERR invalid-uuid" -> IO.puts("Invalid UUID skipped: #{uuid}")
-      other -> IO.puts("Unexpected reply: #{inspect(other)}")
-    end
-  end
-
 
   defp send_command(port, cmd) do
     Port.command(port, cmd <> "\n")
