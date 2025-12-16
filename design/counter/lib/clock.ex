@@ -7,7 +7,6 @@ defmodule Clock do
     your_heart_desire.(count)
     new_counter = Counter.Core.inc(count)
     :timer.sleep(1_000)
-    run(your_heart_desire,new_counter)
+    run(your_heart_desire, new_counter)
   end
-  
 end
