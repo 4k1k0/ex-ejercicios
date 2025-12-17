@@ -12,10 +12,10 @@ defmodule Mastery.Boundary.Validator do
     end
   end
 
-  def check(true=_valid, _message), do: :ok
-  def check(false=_valid, message), do: message
+  def check(true = _valid, _message), do: :ok
+  def check(false = _valid, message), do: message
 
-  defp check_required_field(true=_present, fields, errors, field_name, f) do
+  defp check_required_field(true = _present, fields, errors, field_name, f) do
     valid = fields |> Map.fetch!(field_name) |> f.()
     check_field(valid, errors, field_name)
   end
@@ -25,11 +25,12 @@ defmodule Mastery.Boundary.Validator do
   end
 
   defp check_field(:ok, _errors, _field_name), do: :ok
+
   defp check_field({:error, message}, errors, field_name) do
     errors ++ [{field_name, message}]
   end
+
   defp check_field({:errors, messages}, errors, field_name) do
     errors ++ Enum.map(messages, &{field_name, &1})
   end
-  
 end

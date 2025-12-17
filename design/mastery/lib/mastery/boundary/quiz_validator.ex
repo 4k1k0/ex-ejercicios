@@ -12,11 +12,12 @@ defmodule Mastery.Boundary.QuizValidator do
   def validate_title(title) when is_binary(title) do
     check(String.match?(title, ~r{\S}), {:error, "can't be blank"})
   end
+
   def validate_title(_title), do: {:error, "must be a string"}
 
   def validate_mastery(mastery) when is_integer(mastery) do
     check(mastery >= 1, {:error, "must be grater than zero"})
   end
+
   def validate_mastery(_mastery), do: {:error, "must be an integer"}
-  
 end

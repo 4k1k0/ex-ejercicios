@@ -3,13 +3,14 @@ defmodule Mastery.Boundary.TemplateValidator do
 
   def errors(fields) when is_list(fields) do
     fields = Map.new(fields)
+
     []
     |> require(fields, :name, &validate_name/1)
     |> require(fields, :category, &validate_name/1)
     |> require(fields, :instructions, &validate_instructions/1)
     |> require(fields, :raw, &validate_raw/1)
     |> require(fields, :generators, &validate_generators/1)
-    |> require(fields, :checker, nil)
+    |> require(fields, :checker, &validate_checker/1)
   end
 
   def validate_name(name) when is_atom(name), do: :ok
@@ -17,11 +18,11 @@ defmodule Mastery.Boundary.TemplateValidator do
 
   def validate_instructions(instructions) when is_binary(instructions), do: :ok
   def validate_instructions(_instructions), do: {:error, "must be a binary"}
-  
 
   def validate_raw(raw) when is_binary(raw) do
     check(String.match?(raw, ~r{\S}), {:error, "can't be blank"})
   end
+
   def validate_raw(_raw), do: {:error, "must be a string"}
 
   def validate_generators(generators) when is_map(generators) do
@@ -33,19 +34,21 @@ defmodule Mastery.Boundary.TemplateValidator do
       errors -> {:errors, errors}
     end
   end
+
   def validate_generators(_generators), do: {:error, "must be a map"}
 
   def validate_generator({name, generator})
-  when is_atom(name) and is_list(generator) do
+      when is_atom(name) and is_list(generator) do
     check(generator != [], {:error, "can't be empty"})
   end
+
   def validate_generator({name, generator})
-  when is_atom(name) and is_function(generator) do
+      when is_atom(name) and is_function(generator) do
     :ok
   end
+
   def validate_generator(_generator), do: {:error, "must be a string to list or a function pair"}
 
   def validate_checker(checker) when is_function(checker), do: :ok
   def validate_checker(_checker), do: {:error, "must be an arity 2 function"}
-
 end
