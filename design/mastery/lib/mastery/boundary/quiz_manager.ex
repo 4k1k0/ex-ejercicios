@@ -1,4 +1,4 @@
-defmodule Mastery.Core.QuizManager do
+defmodule Mastery.Boundary.QuizManager do
   alias Mastery.Core.Quiz
   use GenServer
 
@@ -8,8 +8,6 @@ defmodule Mastery.Core.QuizManager do
 
   def ini(_), do: {:error, "quizzes must be a map"}
 
-
-
   def build_quiz(manager \\ __MODULE__, quiz_fields) do
     GenServer.call(manager, {:build_quiz, quiz_fields})
   end
@@ -17,7 +15,6 @@ defmodule Mastery.Core.QuizManager do
   def add_template(manager \\ __MODULE__, quiz_title, template_fields) do
     GenServer.call(manager, {:add_template, quiz_title, template_fields})
   end
-
 
   def lookup_quiz_by_title(manager \\ __MODULE__, quiz_title) do
     GenServer.call(manager, {:lookup_quiz_by_title, quiz_title})
@@ -30,14 +27,15 @@ defmodule Mastery.Core.QuizManager do
   end
 
   def handle_call({:add_template, quiz_title, template_fields}, _from, quizzes) do
-    new_quizzes = Map.update!(quizzes, quiz_title, fn quizz ->
-      Quiz.add_template(quizz, template_fields)
-    end)
+    new_quizzes =
+      Map.update!(quizzes, quiz_title, fn quizz ->
+        Quiz.add_template(quizz, template_fields)
+      end)
+
     {:reply, :ok, new_quizzes}
   end
 
   def handle_call({:lookup_quiz_by_title, quizz_title}, _from, quizzes) do
-    {:reply, quizzes[quizz_title] , quizzes}
+    {:reply, quizzes[quizz_title], quizzes}
   end
 end
-
