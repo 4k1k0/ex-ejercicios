@@ -45,10 +45,11 @@ defmodule Mastery.Boundary.QuizSession do
   def handle_call({:answer_question, answer, fun}, _from, {quiz, email}) do
     fun = fun || fn r, f -> f.(r) end
     response = Response.new(quiz, email, answer)
-    fun.(response, fn r -> 
+
+    fun.(response, fn r ->
       quiz
-        |> Quiz.answer_question(r)
-        |> Quiz.select_question()
+      |> Quiz.answer_question(r)
+      |> Quiz.select_question()
     end)
     |> maybe_finish(email)
   end
@@ -63,7 +64,7 @@ defmodule Mastery.Boundary.QuizSession do
 
   def active_sessions_for(quiz_title) do
     Mastery.Supervisor.QuizSession
-    |> DynamicSupervisor.which_children
+    |> DynamicSupervisor.which_children()
     |> Enum.filter(&child_pid?/1)
     |> Enum.flat_map(&active_sessions(&1, quiz_title))
   end
@@ -75,12 +76,13 @@ defmodule Mastery.Boundary.QuizSession do
   defp child_pid?({:undefined, pid, :worker, [__MODULE__]}) when is_pid(pid) do
     true
   end
+
   defp child_pid?(_child), do: false
 
   defp active_sessions({:undefined, pid, :worker, [__MODULE__]}, title) do
     Mastery.Registry.QuizSession
     |> Registry.keys(pid)
-    |> Enum.filter(fn {quiz_title, _email} -> 
+    |> Enum.filter(fn {quiz_title, _email} ->
       quiz_title == title
     end)
   end
