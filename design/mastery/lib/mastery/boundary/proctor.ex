@@ -41,7 +41,7 @@ defmodule Mastery.Boundary.Proctor do
     build_reply_with_timeout({:noreply}, remaining_quizzes, now)
   end
 
-  def handle_info({:end_quizz, title}, quizzes) do
+  def handle_info({:end_quiz, title}, quizzes) do
     QuizManager.remove_quiz(title)
 
     title
