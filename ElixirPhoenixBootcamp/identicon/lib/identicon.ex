@@ -21,7 +21,7 @@ defmodule Identicon do
   end
 
   def pick_color(%Identicon.Image{hex: [r, g, b | _tail]} = image) do
-    %Identicon.Image{image | color: {r, b, g}}
+    %Identicon.Image{image | color: {r, g, b}}
   end
 
   def build_grid(%Identicon.Image{hex: hex} = image) do
