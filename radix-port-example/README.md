@@ -8,7 +8,24 @@ This example demonstrates maintaining an Adaptive Radix Tree (ART) in Rust (usin
 
 From repository root:
 
-```bash
+```shell
 cd rust_port
 cargo build --release
+```
+
+## Usage
+
+```shell
+iex -S mix
+> {:ok, _} = RadixPort.start_link "home/wako/code/elixir/ex-ejercicios/radix-port-example/rust-port/target/release/rust-port"
+> RadixPort.ingest_file "/home/wako/code/go/src/file/users-20.txt"
+> RadixPort.search "wako"
+{:error, :invalid_uuid}
+> RadixPort.insert "wako"
+{:error, :invalid_uuid}
+> RadixPort.insert "b79f6667-5461-41bd-a8b6-0a854729bbd5"
+:ok
+> RadixPort.search "b79f6667-5461-41bd-a8b6-0a854729bbd5"
+true
+>
 ```
