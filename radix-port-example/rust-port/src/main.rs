@@ -48,15 +48,19 @@ fn main() -> io::Result<()> {
             "INSERT_CHUNK" => {
                 if let (Some(ref mut map), Some(chunk)) = (&mut tree, arg) {
                     let mut all_ok = true;
-                    
+
                     for token in chunk.split_whitespace() {
                         match Uuid::parse_str(token) {
-                            Ok(uuid) => { map.insert(*uuid.as_bytes(), 1u8); }
-                            Err(_) => { all_ok = false; }
+                            Ok(uuid) => {
+                                map.insert(*uuid.as_bytes(), 1u8);
+                            }
+                            Err(_) => {
+                                all_ok = false;
+                            }
                         }
                     }
 
-                    if all_ok  {
+                    if all_ok {
                         write_resp("OK")?;
                     } else {
                         write_resp("ERR invalid uuid")?;
